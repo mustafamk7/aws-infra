@@ -72,12 +72,19 @@ jobs:
           terraform_version: ${{ env.TERRAFORM_VERSION }}
           terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
 
-      - name: Authenticate AWS
-        uses: ./.github/actions/authenticate_aws
+      - name: Authenticate to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws_role: ${{ vars.AWS_GITHUB_ROLE }}
+          role-to-assume: arn:aws:iam::142639757987:role/test-github-oidc-role
+          aws-region: us-east-1
+
+    #   - name: Authenticate AWS
+    #     uses: ./.github/actions/authenticate_aws
+    #     with:
+    #       aws_role: ${{ vars.AWS_GITHUB_ROLE }}
 
       - name: Run Terragrunt
         uses: ./.github/actions/run_terragrunt
         with:
           working_directory: ${{ env.working_directory }}
+
