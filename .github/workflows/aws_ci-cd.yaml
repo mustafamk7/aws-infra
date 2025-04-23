@@ -4,28 +4,23 @@ on:
   push:
     branches:
       - main
+      - feat/infra
     paths:
       - .github/workflows/aws_ci-cd.yaml
       - .github/actions/authenticate_aws/**
       - .github/actions/install_tools/**
-      - .github/actions/run_plan_apply/**
       - terragrunt.hcl
-      - config/project*
-      - config/service_aws.yaml
       - aws/**
       - "!aws/**/*.md"
       - "!aws/**/*.txt"
-  pull_request:
-    branches:
-      - main
+#   pull_request:
+#     branches:
+#       - main
     paths:
       - .github/workflows/aws_ci-cd.yaml
       - .github/actions/authenticate_aws/**
       - .github/actions/install_tools/**
-      - .github/actions/run_plan_apply/**
       - terragrunt.hcl
-      - config/project*
-      - config/service_aws.yaml
       - aws/**
       - "!aws/**/*.md"
       - "!aws/**/*.txt"
