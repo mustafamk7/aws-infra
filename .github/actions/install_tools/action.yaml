@@ -1,0 +1,27 @@
+name: 'Install tools'
+description: 'Clones the repository and installs required tools'
+inputs:
+  terraform_version:
+    description: 'Terraform version'
+    required: true
+  terragrunt_version:
+    description: 'Terragrunt version'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: "${{ inputs.terraform_version }}"
+        terraform_wrapper: false
+
+    - name: Install Terragrunt
+      uses: jaxxstorm/action-install-gh-release@v1.14.0
+      with:
+        repo: gruntwork-io/terragrunt
+        tag: "${{ inputs.terragrunt_version }}"
+        extension-matching: disable
+        rename-to: terragrunt
+        chmod: 0755

@@ -1,0 +1,19 @@
+name: "Authenticate AWS"
+description: "Authenticates AWS credentials"
+inputs:
+  aws_role:
+    description: "AWS role to assume"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: AWS auth
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        aws-region: us-east-1
+        role-to-assume: ${{ inputs.aws_role }}
+
+    - name: Verify AWS credentials
+      shell: bash
+      run: aws sts get-caller-identity

@@ -1,0 +1,94 @@
+name: "Run Terragrunt"
+description: "Orchestrates Terragrunt operations directly"
+
+inputs:
+  working_directory:
+    description: "Directory containing Terragrunt configurations"
+    required: true
+  init_parallel:
+    description: "Number of parallel init operations"
+    required: false
+    default: "1"
+  plan_parallel:
+    description: "Number of parallel plan operations"
+    required: false
+    default: "1"
+  apply_parallel:
+    description: "Number of parallel apply operations"
+    required: false
+    default: "1"
+
+runs:
+  using: composite
+  steps:
+    - name: List changed directories
+      id: list
+      shell: bash
+      run: |
+        echo "CHANGED_DIRS=$(git diff --name-only origin/main...HEAD | grep '${{ inputs.working_directory }}' | cut -d/ -f1-2 | sort -u | tr '\n' ' ')" >> $GITHUB_OUTPUT
+
+    - name: Init Terragrunt
+      if: steps.list.outputs.CHANGED_DIRS != ''
+      shell: bash
+      run: |
+        for dir in ${{ steps.list.outputs.CHANGED_DIRS }}; do
+          echo "Initializing $dir"
+          terragrunt run-all init --terragrunt-working-dir $dir -lock=false --terragrunt-non-interactive
+        done
+
+    - name: Plan Terragrunt
+      shell: bash
+      run: |
+        echo '<details><summary>Plan Results:</summary>' > diff.txt
+        echo >> diff.txt
+
+        if [[ -z "${{ steps.list.outputs.CHANGED_DIRS }}" ]]; then
+          echo '### No changed directories found.' >> diff.txt
+        else
+          for dir in ${{ steps.list.outputs.CHANGED_DIRS }}; do
+            echo "## Planning $dir" >> diff.txt
+            echo '```terraform' >> diff.txt
+            terragrunt run-all plan \
+              --terragrunt-working-dir $dir \
+              --terragrunt-non-interactive \
+              --terragrunt-include-external-dependencies \
+              -lock=false -no-color 2>&1 >> diff.txt
+            echo '```' >> diff.txt
+          done
+        fi
+
+        echo '</details>' >> diff.txt
+
+    - name: Truncate plan output if needed
+      shell: bash
+      run: |
+        FILE_SIZE=$(wc -c < diff.txt)
+        if [ $FILE_SIZE -gt 65000 ]; then
+          head -c 65000 diff.txt > temp.txt
+          echo '</details>' >> temp.txt
+          echo $'\n\n**Output truncated. See logs for full details.**' >> temp.txt
+          mv temp.txt diff.txt
+        fi
+
+        cat diff.txt >> $GITHUB_STEP_SUMMARY
+
+    - name: Comment on PR with plan output
+      if: github.event_name == 'pull_request'
+      uses: marocchino/sticky-pull-request-comment@v2
+      with:
+        header: ${{ inputs.working_directory }}
+        recreate: true
+        path: diff.txt
+
+    - name: Apply Terragrunt
+      if: steps.list.outputs.CHANGED_DIRS != '' && github.event_name == 'push' && github.ref_name == 'main'
+      shell: bash
+      run: |
+        for dir in ${{ steps.list.outputs.CHANGED_DIRS }}; do
+          echo "Applying $dir"
+          terragrunt run-all apply \
+            --terragrunt-working-dir $dir \
+            --terragrunt-non-interactive \
+            --terragrunt-include-external-dependencies \
+            -auto-approve -lock-timeout=10m
+        done

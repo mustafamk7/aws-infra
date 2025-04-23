@@ -1,0 +1,85 @@
+name: AWS CI/CD
+
+on:
+  push:
+    branches:
+      - main
+      - feat/infra
+    paths:
+      - .github/workflows/aws_ci-cd.yaml
+      - .github/actions/authenticate_aws/**
+      - .github/actions/install_tools/**
+      - terragrunt.hcl
+      - aws/**
+      - "!aws/**/*.md"
+      - "!aws/**/*.txt"
+#   pull_request:
+#     branches:
+#       - main
+    # paths:
+    #   - .github/workflows/aws_ci-cd.yaml
+    #   - .github/actions/authenticate_aws/**
+    #   - .github/actions/install_tools/**
+    #   - terragrunt.hcl
+    #   - aws/**
+    #   - "!aws/**/*.md"
+    #   - "!aws/**/*.txt"
+  workflow_dispatch:
+    inputs:
+      working_directory:
+        description: "Working directory"
+        required: true
+        default: "aws"
+
+env:
+  TERRAFORM_VERSION: "v1.11.2"
+  TERRAGRUNT_VERSION: "v0.77.7"
+  AWS_GITHUB_ROLE: "arn:aws:iam::142639757987:role/test-github-oidc-role"
+  working_directory: ${{ github.event_name == 'workflow_dispatch' && inputs.working_directory || 'aws' }}
+
+permissions:
+  contents: read
+  id-token: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  aws:
+    name: CI/CD
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate working directory
+        run: |
+          if [[ ! "${{ env.working_directory }}" =~ ^aws ]]; then
+            echo "Invalid working directory: ${{ env.working_directory }}.  It should start with 'aws'."
+            exit 1
+          fi
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          # It needs to fetch longer in order for terramate to detect diffs
+          fetch-depth: 0
+
+      - name: Install tools
+        uses: ./.github/actions/install_tools
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terragrunt_version: ${{ env.TERRAGRUNT_VERSION }}
+
+      - name: Authenticate to AWS (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::142639757987:role/test-github-oidc-role
+          aws-region: us-east-1
+
+    #   - name: Authenticate AWS
+    #     uses: ./.github/actions/authenticate_aws
+    #     with:
+    #       aws_role: ${{ vars.AWS_GITHUB_ROLE }}
+
+      - name: Run Terragrunt
+        uses: ./.github/actions/run_terragrunt
+        with:
+          working_directory: ${{ env.working_directory }}
+
